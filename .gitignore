@@ -1,3 +1,5 @@
 .idea/
 target/
 gp_experiments.iml
+.*.swp
+*.csv
