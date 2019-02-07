@@ -18,7 +18,7 @@ public class ZeroNoiseExample {
      * @return Output value.
      */
     static double y(double x) {
-        return 2.3*x + Math.sin(2.0*Math.PI * x);
+        return 2.3*x + Math.sin(2.0 * 2.0*Math.PI * x);
     }
 
     /**
@@ -30,7 +30,7 @@ public class ZeroNoiseExample {
      * @return Output value.
      */
     static double kernelFunction(double x1, double x2) {
-        return Math.exp(-0.5 * (x1 - x2)*(x1 - x2));
+        return Math.exp(-0.5 * (x1 - x2)*(x1 - x2)/0.25);
     }
 
     /**
@@ -44,6 +44,24 @@ public class ZeroNoiseExample {
         double[] output = new double[N];
         for (int i=0; i < N; i++) {
             output[i] = x_min + (x_max - x_min) * i / (N - 1.0);
+        }
+
+        return output;
+    }
+
+    /**
+     * Concatenated two arrays.
+     * @param x1 First array.
+     * @param x2 Second array.
+     * @return [x1 ; x2]
+     */
+    static double[] concat(double[] x1, double[] x2) {
+        double[] output = new double[x1.length + x2.length];
+        for (int i=0; i < x1.length; i++) {
+            output[i] = x1[i];
+        }
+        for (int i=0; i < x2.length; i++) {
+            output[x1.length + i] = x2[i];
         }
 
         return output;
@@ -115,10 +133,16 @@ public class ZeroNoiseExample {
         double x_max = 3.0;
 
         int N_observed = 10;
-        double[] samplePoints = generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
+
+        double[] sp1 = generateEvenlySpacedPoints(0.0, 1.0, 10);
+        double[] sp2 = generateEvenlySpacedPoints(2.0, 3.0, 10);
+        double[] samplePoints = concat(sp1, sp2);
+
+//        double[] samplePoints = generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
+
 
         // Generate an even grid of many points that we'll use to plot the function.
-        int N_star = 100;
+        int N_star = 300;
         double[] evenlySpacedPoints = generateEvenlySpacedPoints(x_min, x_max, N_star);
 
         runExperiment(samplePoints, ZeroNoiseExample::y, ZeroNoiseExample::kernelFunction, evenlySpacedPoints);
