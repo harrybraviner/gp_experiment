@@ -31,6 +31,54 @@ public class ZeroNoiseExample {
 //        throw new RuntimeException("Not implemented");
     }
 
+    /**
+     * Returns (by mutating arrays passed in) the posterior means and variances
+     * for new x-values.
+     *
+     * @param kernelMatrix Matrix of the prior covariances between y-values. Column-major order.
+     * @param originalXValues x-values of the original observations.
+     * @param originalYValues y-values of the original observations.
+     * @param newXValues x-values we want predictions for.
+     * @param outMeans Posterior means at the new x-values.
+     * @param outStddevs Posterior standard deviations at the new x-values.
+     */
+    static void getPredictionsAndStddevs(double[] kernelMatrix, double[] originalXValues,
+                                         double[] originalYValues, double[] newXValues,
+                                         double[] outMeans, double[] outStddevs) {
+        // Pull out N and N* and check that dimensions all make sense.
+        int N = (int)Math.sqrt(kernelMatrix.length);
+        if (N*N != kernelMatrix.length) {
+            throw new IllegalArgumentException("kernelMatrix was not square.");
+        }
+        if (originalXValues.length != N) {
+            throw new IllegalArgumentException("originalXValues size does not match kernelMatrix.");
+        }
+        if (originalYValues.length != N) {
+            throw new IllegalArgumentException("originalYValues size does not match kernelMatrix.");
+        }
+
+        int N_star = newXValues.length;
+        if (outMeans.length != N_star) {
+            throw new IllegalArgumentException("outMeans size does not match newXValues.");
+        }
+        if (outStddevs.length != N_star) {
+            throw new IllegalArgumentException("outStddevs size does not match newXValues.");
+        }
+
+        // Construct the matrix of covariances of new x-value and original
+        // (stored in column-major order)
+        double[] matrixKStar = new double[N*N_star];
+        for (int i=0; i < N; i++) {
+            for (int j=0; j < N_star; j++) {
+                matrixKStar[i + j*N] = kernelFunction(originalXValues[i], newXValues[j]);
+            }
+        }
+
+        // FIXME - compute K^-1 (f - 0) using dsysv.
+        // FIXME - then act with K_*^T, that will give us the mean.
+
+    }
+
     public static void main(String[] args) {
 
         LAPACK lapack = LAPACK.getInstance();
@@ -53,48 +101,23 @@ public class ZeroNoiseExample {
 
         double[] matrix_K = new double[N_observed*N_observed];
         for (int i=0; i < N_observed; i++) {
-            // Only need to populate the upper-triangular part
-            for (int j=i; j < N_observed; j++) {
-                matrix_K[i*N_observed + j] = kernelFunction(samplePoints[i], samplePoints[j]);
-            }
-        }
-
-        double[] matrix_K_inverse = matrix_K.clone();
-
-        for (int i=0; i < N_observed; i++) {
-            System.out.print("[");
+            // Populate the whole thing since I'll use general matrix routines for now
             for (int j=0; j < N_observed; j++) {
-                System.out.print(matrix_K_inverse[i*N_observed + j] + "\t");
+                matrix_K[i + j*N_observed] = kernelFunction(samplePoints[i], samplePoints[j]);
             }
-            System.out.println("]");
         }
-        System.out.println();
-        System.out.println();
 
-        double[] work = new double[N_observed*N_observed];
-        int[] ipiv = new int[N_observed];
-        intW info = new intW(0);
-        lapack.dsytrf("U", N_observed, matrix_K_inverse, N_observed, ipiv, work, N_observed*N_observed, info);
-
-        System.out.println("Info: " + info.val);
-        System.out.println();
-
-        System.out.print("[");
-        for (int i=0; i < ipiv.length; i++) {
-            System.out.print(ipiv[i] + "\t");
+        // Generate an even grid of many points that we'll use to plot the function.
+        int N_star = 100;
+        double[] evenlySpacedPoints = new double[N_star];
+        for (int i=0; i < N_star; i++) {
+            evenlySpacedPoints[i] = x_min + (x_max - x_min) * i / (N_star - 1.0);
         }
-        System.out.println("]");
-        System.out.println();
 
-        for (int i=0; i < N_observed; i++) {
-            System.out.print("[");
-            for (int j=0; j < N_observed; j++) {
-                System.out.print(matrix_K_inverse[i*N_observed + j] + "\t");
-            }
-            System.out.println("]");
-        }
-        System.out.println();
-        System.out.println();
+        double[] posteriorMeans = new double[N_star];
+        double[] posteriorStddevs = new double[N_star];
+        getPredictionsAndStddevs(matrix_K, samplePoints, sampleY, evenlySpacedPoints,
+                posteriorMeans, posteriorStddevs);
 
     }
 
