@@ -86,9 +86,6 @@ public class ZeroNoiseExample {
             }
         }
 
-        // FIXME - compute K^-1 (f - 0) using dsysv.
-        // FIXME - then act with K_*^T, that will give us the mean.
-
         double[] kernelMatrixClone = kernelMatrix.clone();
         int[] ipiv = new int[N];
 
@@ -97,14 +94,6 @@ public class ZeroNoiseExample {
         for (int i=0; i < N; i++) {
             rhs[N*N_star + i] = originalYValues[i];
         }
-
-        int count = 0;
-        for (int j = 0; j < rhs.length; j++) {
-            if (rhs[j] != 0.0) {
-                count++;
-            }
-        }
-        System.out.println("count: " + count);
 
         int lWork = N;
         double[] work = new double[N];
@@ -115,22 +104,6 @@ public class ZeroNoiseExample {
         double[] outputMemory = new double[N_star*(N_star + 1)];
         // This populates outputMemory with K_*^T acting on the K^(-1) [K_*, f]
         blas.dgemm("T", "N", N_star, (N_star + 1), N, 1.0, matrixKStar, N, rhs, N, 0.0, outputMemory, N_star);
-
-        count = 0;
-        for (int j = 0; j < rhs.length; j++) {
-            if (rhs[j] != 0.0) {
-                count++;
-            }
-        }
-        System.out.println("count: " + count);
-
-        count = 0;
-        for (int j = 0; j < outputMemory.length; j++) {
-            if (outputMemory[j] != 0.0) {
-                count++;
-            }
-        }
-        System.out.println("count: " + count);
 
         double[] posteriorMeans = new double[N_star];
         for (int i=0; i<N_star; i++) {
