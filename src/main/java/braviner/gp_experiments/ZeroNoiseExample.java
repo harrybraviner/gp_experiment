@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import com.github.fommil.netlib.LAPACK;
@@ -81,10 +82,35 @@ public class ZeroNoiseExample {
         return output;
     }
 
+    static void runExperiment(double[] observationPoints, Function<Double, Double> underlyingFunction,
+                              BiFunction<Double, Double, Double> kernel, double[] testPoints) throws IOException {
+
+        double[] observationY = applyFunction(ZeroNoiseExample::y, observationPoints);
+
+        double[] trueValuesAtTestPoints = applyFunction(ZeroNoiseExample::y, testPoints);
+
+        // Model as a Gaussian process to get posterior for the mean and variance at the test points.
+        GPUtils.PosteriorResults results = GPUtils.getPredictionsAndStddevs(observationPoints, observationY,
+                ZeroNoiseExample::kernelFunction, testPoints);
+
+        // Write results to a file
+        try (BufferedWriter samplePointsWriter = new BufferedWriter(new FileWriter("samplePoints.csv"))) {
+            samplePointsWriter.write("x,y\n");
+            for (int i=0; i < observationPoints.length; i++) {
+                samplePointsWriter.write(observationPoints[i] + "," + observationY[i] + "\n");
+            }
+        }
+
+        try (BufferedWriter predictionsWriter = new BufferedWriter(new FileWriter("predictions.csv"))) {
+            predictionsWriter.write("x,postMean,postVar,trueY\n");
+            for (int i=0; i < testPoints.length; i++) {
+                predictionsWriter.write(testPoints[i] + "," + results.getMeans()[i] + "," + results.getVariances()[i] +
+                        "," + trueValuesAtTestPoints[i] + "\n");
+            }
+        }
+    }
+
     public static void main(String[] args) throws IOException {
-
-        LAPACK lapack = LAPACK.getInstance();
-
         Random rng = new Random(1234);
 
         double x_min = 0.0;
@@ -93,33 +119,11 @@ public class ZeroNoiseExample {
         int N_observed = 10;
         double[] samplePoints = generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
 
-        double[] sampleY = applyFunction(ZeroNoiseExample::y, samplePoints);
-
         // Generate an even grid of many points that we'll use to plot the function.
         int N_star = 100;
         double[] evenlySpacedPoints = generateEvenlySpacedPoints(x_min, x_max, N_star);
 
-        double[] trueValues = applyFunction(ZeroNoiseExample::y, evenlySpacedPoints);
-
-        // Model as a Gaussian process to get posterior for the mean and variance at the test points.
-        GPUtils.PosteriorResults results = GPUtils.getPredictionsAndStddevs(samplePoints, sampleY,
-                ZeroNoiseExample::kernelFunction, evenlySpacedPoints);
-
-        // Write results to a file
-        try (BufferedWriter samplePointsWriter = new BufferedWriter(new FileWriter("samplePoints.csv"))) {
-            samplePointsWriter.write("x,y\n");
-            for (int i=0; i < samplePoints.length; i++) {
-                samplePointsWriter.write(samplePoints[i] + "," + sampleY[i] + "\n");
-            }
-        }
-
-        try (BufferedWriter predictionsWriter = new BufferedWriter(new FileWriter("predictions.csv"))) {
-            predictionsWriter.write("x,postMean,postVar,trueY\n");
-            for (int i=0; i < evenlySpacedPoints.length; i++) {
-                predictionsWriter.write(evenlySpacedPoints[i] + "," + results.getMeans()[i] + "," + results.getVariances()[i] +
-                        "," + trueValues[i] + "\n");
-            }
-        }
+        runExperiment(samplePoints, ZeroNoiseExample::y, ZeroNoiseExample::kernelFunction, evenlySpacedPoints);
 
     }
 
