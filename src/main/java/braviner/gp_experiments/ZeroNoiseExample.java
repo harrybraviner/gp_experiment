@@ -7,8 +7,6 @@ import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import com.github.fommil.netlib.LAPACK;
-
 public class ZeroNoiseExample {
 
     /**
@@ -85,13 +83,13 @@ public class ZeroNoiseExample {
     static void runExperiment(double[] observationPoints, Function<Double, Double> underlyingFunction,
                               BiFunction<Double, Double, Double> kernel, double[] testPoints) throws IOException {
 
-        double[] observationY = applyFunction(ZeroNoiseExample::y, observationPoints);
+        double[] observationY = applyFunction(underlyingFunction, observationPoints);
 
-        double[] trueValuesAtTestPoints = applyFunction(ZeroNoiseExample::y, testPoints);
+        double[] trueValuesAtTestPoints = applyFunction(underlyingFunction, testPoints);
 
         // Model as a Gaussian process to get posterior for the mean and variance at the test points.
         GPUtils.PosteriorResults results = GPUtils.getPredictionsAndStddevs(observationPoints, observationY,
-                ZeroNoiseExample::kernelFunction, testPoints);
+                kernel, testPoints);
 
         // Write results to a file
         try (BufferedWriter samplePointsWriter = new BufferedWriter(new FileWriter("samplePoints.csv"))) {
