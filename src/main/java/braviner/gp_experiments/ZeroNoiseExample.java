@@ -7,7 +7,6 @@ import java.util.Arrays;
 import java.util.Random;
 import com.github.fommil.netlib.LAPACK;
 import com.github.fommil.netlib.BLAS;
-import javafx.geometry.Pos;
 import org.netlib.util.intW;
 
 public class ZeroNoiseExample {
