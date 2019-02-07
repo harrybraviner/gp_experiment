@@ -3,9 +3,11 @@ package braviner.gp_experiments;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Random;
 import com.github.fommil.netlib.LAPACK;
 import com.github.fommil.netlib.BLAS;
+import javafx.geometry.Pos;
 import org.netlib.util.intW;
 
 public class ZeroNoiseExample {
@@ -35,6 +37,16 @@ public class ZeroNoiseExample {
 //        throw new RuntimeException("Not implemented");
     }
 
+    static class PosteriorResults {
+        private double[] means;
+        private double[] variances;
+
+        PosteriorResults(double[] means, double[] variances) {
+            this.means = means;
+            this.variances = variances;
+        }
+    }
+
     /**
      * Returns (by mutating arrays passed in) the posterior means and variances
      * for new x-values.
@@ -43,12 +55,10 @@ public class ZeroNoiseExample {
      * @param originalXValues x-values of the original observations.
      * @param originalYValues y-values of the original observations.
      * @param newXValues x-values we want predictions for.
-     * @param outMeans Posterior means at the new x-values.
-     * @param outStddevs Posterior standard deviations at the new x-values.
+     * @return Posterior means and variances at each point in newXValues.
      */
-    static void getPredictionsAndStddevs(double[] kernelMatrix, double[] originalXValues,
-                                         double[] originalYValues, double[] newXValues,
-                                         double[] outMeans, double[] outStddevs) {
+    static PosteriorResults getPredictionsAndStddevs(double[] kernelMatrix, double[] originalXValues,
+                                        double[] originalYValues, double[] newXValues) {
 
         LAPACK lapack = LAPACK.getInstance();
         BLAS blas = BLAS.getInstance();
@@ -66,12 +76,6 @@ public class ZeroNoiseExample {
         }
 
         int N_star = newXValues.length;
-        if (outMeans.length != N_star) {
-            throw new IllegalArgumentException("outMeans size does not match newXValues.");
-        }
-        if (outStddevs.length != N_star) {
-            throw new IllegalArgumentException("outStddevs size does not match newXValues.");
-        }
 
         // Construct the matrix of covariances of new x-value and original
         // (stored in column-major order)
@@ -87,15 +91,63 @@ public class ZeroNoiseExample {
 
         double[] kernelMatrixClone = kernelMatrix.clone();
         int[] ipiv = new int[N];
-        double[] originalYValuesClone = originalYValues.clone();
+
+        // We'll package getting the posterior mean and the posterior variance into one calculation
+        double[] rhs = Arrays.copyOf(matrixKStar, N*(N_star + 1));
+        for (int i=0; i < N; i++) {
+            rhs[N*N_star + i] = originalYValues[i];
+        }
+
+        int count = 0;
+        for (int j = 0; j < rhs.length; j++) {
+            if (rhs[j] != 0.0) {
+                count++;
+            }
+        }
+        System.out.println("count: " + count);
+
         int lWork = N;
         double[] work = new double[N];
         intW info = new intW(0);
-        // This populates originalYValuesClone with the solutions to the linear equation K x = f
-        lapack.dsysv("U", N, N, kernelMatrixClone, N, ipiv, originalYValuesClone, N_star, work, lWork, info);
+        // This populates originalYValuesClone with the solutions to the linear equation K x = [K_*, f]
+        lapack.dsysv("U", N, (N_star + 1), kernelMatrixClone, N, ipiv, rhs, N_star, work, lWork, info);
 
-        // This populate muStarOutput with K_*^T acting on the K^(-1) f
-        blas.dgemv("T", N, N_star, 1.0, matrixKStar, N, originalYValuesClone, 1, 0.0, outMeans, 1);
+        double[] outputMemory = new double[N_star*(N_star + 1)];
+        // This populates outputMemory with K_*^T acting on the K^(-1) [K_*, f]
+        blas.dgemm("T", "N", N_star, (N_star + 1), N, 1.0, matrixKStar, N, rhs, N, 0.0, outputMemory, N_star);
+
+        count = 0;
+        for (int j = 0; j < rhs.length; j++) {
+            if (rhs[j] != 0.0) {
+                count++;
+            }
+        }
+        System.out.println("count: " + count);
+
+        count = 0;
+        for (int j = 0; j < outputMemory.length; j++) {
+            if (outputMemory[j] != 0.0) {
+                count++;
+            }
+        }
+        System.out.println("count: " + count);
+
+        double[] posteriorMeans = new double[N_star];
+        for (int i=0; i<N_star; i++) {
+            posteriorMeans[i] = outputMemory[N_star*N_star + i];
+        }
+
+        // Construct the matrix of prior covariances of the new points,
+        // and subtract K_*^T K^-1 K_* at the same time.
+        double[] posteriorVariances = new double[N_star*N_star];
+        for (int i=0; i < N_star; i++) {
+            for (int j=0; j < N_star; j++) {
+                posteriorVariances[i + j*N_star] = kernelFunction(newXValues[i], newXValues[j])
+                        - outputMemory[i + j*N_star];
+            }
+        }
+
+        return new PosteriorResults(posteriorMeans, posteriorVariances);
 
     }
 
@@ -108,7 +160,7 @@ public class ZeroNoiseExample {
         double x_min = 0.0;
         double x_max = 3.0;
 
-        int N_observed = 10;
+        int N_observed = 6;
         double[] samplePoints = new double[N_observed];
         for (int i=0; i < N_observed; i++) {
             samplePoints[i] = x_min + (x_max - x_min)*rng.nextDouble();
@@ -134,10 +186,7 @@ public class ZeroNoiseExample {
             evenlySpacedPoints[i] = x_min + (x_max - x_min) * i / (N_star - 1.0);
         }
 
-        double[] posteriorMeans = new double[N_star];
-        double[] posteriorStddevs = new double[N_star];
-        getPredictionsAndStddevs(matrix_K, samplePoints, sampleY, evenlySpacedPoints,
-                posteriorMeans, posteriorStddevs);
+        PosteriorResults results = getPredictionsAndStddevs(matrix_K, samplePoints, sampleY, evenlySpacedPoints);
 
         try (BufferedWriter samplePointsWriter = new BufferedWriter(new FileWriter("samplePoints.csv"))) {
             samplePointsWriter.write("x,y\n");
@@ -147,9 +196,9 @@ public class ZeroNoiseExample {
         }
 
         try (BufferedWriter predictionsWriter = new BufferedWriter(new FileWriter("predictions.csv"))) {
-            predictionsWriter.write("x,postMean\n");
+            predictionsWriter.write("x,postMean,postVar\n");
             for (int i=0; i < evenlySpacedPoints.length; i++) {
-                predictionsWriter.write(evenlySpacedPoints[i] + "," + posteriorMeans[i] + "\n");
+                predictionsWriter.write(evenlySpacedPoints[i] + "," + results.means[i] + "," + results.variances[i] + "\n");
             }
         }
 
