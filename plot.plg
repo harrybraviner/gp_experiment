@@ -6,10 +6,12 @@ set datafile separator ","
 set style fill transparent solid 0.75 noborder
 set style line 1 linecolor rgb 'green' lw 1.5
 set style line 2 linecolor rgb 'red' ps 1.5 pt 7
+set style line 3 linetype 2 linecolor rgb 'black'
 
 set key left top
 
 plot "predictions.csv" using 1:($2 + sqrt($3)):($2 - sqrt($3)) w filledcu lc 'gray' title '',\
+"./predictions.csv" using 1:4 w l ls 3 title 'true function value',\
 "./predictions.csv" using 1:2 w l ls 1 title "posterior mean",\
 "./samplePoints.csv" using 1:2 w p ls 2 title 'observed points'
 

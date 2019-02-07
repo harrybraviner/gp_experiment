@@ -66,7 +66,7 @@ public class GPUtils {
                                                      BiFunction<Double, Double, Double> kernelFunction,
                                                      double[] newXValues) {
         double[] kernelMatrix = generateKernelMatrix(kernelFunction, originalXValues, originalXValues);
-        return getPredictionsAndStddevs(originalXValues, originalYValues, kernelFunction, newXValues);
+        return getPredictionsAndStddevs(kernelMatrix, originalXValues, originalYValues, kernelFunction, newXValues);
     }
 
 
