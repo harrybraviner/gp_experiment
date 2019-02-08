@@ -39,14 +39,14 @@ public class GPUtils {
      * @return Matrix in column-major order.
      */
     static double[] generateKernelMatrix(BiFunction<Double, Double, Double> kernelFunction,
-                                         double[] x1, double[] x2) {
+                                         double[] x1, double[] x2, double noiseVar) {
         int N1 = x1.length;
         int N2 = x2.length;
         double[] kernelMatrix = new double[N1*N2];
 
         for (int i=0; i < N1; i++) {
             for (int j=0; j < N2; j++) {
-                kernelMatrix[i + j*N1] = kernelFunction.apply(x1[i], x2[j]);
+                kernelMatrix[i + j*N1] = kernelFunction.apply(x1[i], x2[j]) + (i == j ? noiseVar : 0.0);
             }
         }
 
@@ -64,8 +64,9 @@ public class GPUtils {
      */
     static PosteriorResults getPredictionsAndStddevs(double[] originalXValues, double[] originalYValues,
                                                      BiFunction<Double, Double, Double> kernelFunction,
+                                                     double noiseVar,
                                                      double[] newXValues) {
-        double[] kernelMatrix = generateKernelMatrix(kernelFunction, originalXValues, originalXValues);
+        double[] kernelMatrix = generateKernelMatrix(kernelFunction, originalXValues, originalXValues, noiseVar);
         return getPredictionsAndStddevs(kernelMatrix, originalXValues, originalYValues, kernelFunction, newXValues);
     }
 
@@ -104,6 +105,7 @@ public class GPUtils {
 
         // Construct the matrix of covariances of new x-value and original
         // (stored in column-major order)
+        // N.B.: The noise variance should not appear in this matrix.
         double[] matrixKStar = new double[N*N_star];
         for (int i=0; i < N; i++) {
             for (int j=0; j < N_star; j++) {
@@ -137,6 +139,7 @@ public class GPUtils {
 
         // Construct the matrix of prior covariances of the new points,
         // and subtract K_*^T K^-1 K_* at the same time.
+        // N.B.: The noise variance should not appear in the K_starstar matrix, so we don't need it in here.
         double[] posteriorVariances = new double[N_star*N_star];
         for (int i=0; i < N_star; i++) {
             for (int j=0; j < N_star; j++) {

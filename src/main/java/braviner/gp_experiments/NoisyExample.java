@@ -7,18 +7,15 @@ import java.util.Random;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-public class ZeroNoiseExample {
+public class NoisyExample {
 
-    /**
-     * Underlying function that points are drawn from.
-     *
-     * Sin function with a trend.
-     *
-     * @param x Input value.
-     * @return Output value.
-     */
     static double y(double x) {
-        return 2.3*x + Math.sin(2.0*Math.PI * x);
+        return 2.3 * x + Math.sin(2.0*Math.PI * x);
+    }
+
+    static double noisyY(double noiseStddev, Random rng, double x) {
+        double epsilon = rng.nextGaussian() * noiseStddev;
+        return y(x) + epsilon;
     }
 
     /**
@@ -30,19 +27,20 @@ public class ZeroNoiseExample {
      * @return Output value.
      */
     static double kernelFunction(double x1, double x2) {
-        return Math.exp(-0.5 * (x1 - x2)*(x1 - x2));
+        return 2.0 * Math.exp(-0.5 * (x1 - x2)*(x1 - x2) / 0.1);
     }
 
     static void runExperiment(double[] observationPoints, Function<Double, Double> underlyingFunction,
-                              BiFunction<Double, Double, Double> kernel, double[] testPoints) throws IOException {
+                              Function<Double, Double> functionWithNoise,
+                              BiFunction<Double, Double, Double> kernel, double noiseVar, double[] testPoints) throws IOException {
 
-        double[] observationY = VectorUtils.applyFunction(underlyingFunction, observationPoints);
+        double[] observationY = VectorUtils.applyFunction(functionWithNoise, observationPoints);
 
         double[] trueValuesAtTestPoints = VectorUtils.applyFunction(underlyingFunction, testPoints);
 
         // Model as a Gaussian process to get posterior for the mean and variance at the test points.
         GPUtils.PosteriorResults results = GPUtils.getPredictionsAndStddevs(observationPoints, observationY,
-                kernel, 0.0, testPoints);
+                kernel, noiseVar, testPoints);
 
         // Write results to a file
         try (BufferedWriter samplePointsWriter = new BufferedWriter(new FileWriter("samplePoints.csv"))) {
@@ -70,11 +68,14 @@ public class ZeroNoiseExample {
         int N_observed = 10;
         double[] samplePoints = VectorUtils.generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
 
+        Function<Double, Double> noisyFunction = x -> NoisyExample.noisyY(0.2, rng, x);
+
         // Generate an even grid of many points that we'll use to plot the function.
         int N_star = 100;
         double[] evenlySpacedPoints = VectorUtils.generateEvenlySpacedPoints(x_min, x_max, N_star);
 
-        runExperiment(samplePoints, ZeroNoiseExample::y, ZeroNoiseExample::kernelFunction, evenlySpacedPoints);
+        // FIXME - should not actually work at the moment, due to not having noise term in kernel
+        runExperiment(samplePoints, NoisyExample::y, noisyFunction, NoisyExample::kernelFunction, 0.04, evenlySpacedPoints);
 
     }
 
