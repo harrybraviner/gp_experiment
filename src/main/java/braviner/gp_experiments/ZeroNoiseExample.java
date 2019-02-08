@@ -32,60 +32,12 @@ public class ZeroNoiseExample {
     static double kernelFunction(double x1, double x2) {
         return Math.exp(-0.5 * (x1 - x2)*(x1 - x2));
     }
-
-    /**
-     *
-     * @param x_min Start point (inclusive)
-     * @param x_max End point (inclusive)
-     * @param N Number of points to generate (>= 2)
-     * @return Array of evenly spaced points.
-     */
-    static double[] generateEvenlySpacedPoints(double x_min, double x_max, int N) {
-        double[] output = new double[N];
-        for (int i=0; i < N; i++) {
-            output[i] = x_min + (x_max - x_min) * i / (N - 1.0);
-        }
-
-        return output;
-    }
-
-    /**
-     *
-     * @param x_min Start point (inclusive)
-     * @param x_max End point (exclusive)
-     * @param N Number of points to generate (>= 2)
-     * @return Array of uniformly distributed points.
-     */
-    static double[] generateRandomlySampledPoints(double x_min, double x_max, int N, Random rng) {
-        double[] output = new double[N];
-        for (int i=0; i < N; i++) {
-            output[i] = x_min + (x_max - x_min)*rng.nextDouble();
-        }
-
-        return output;
-    }
-
-    /**
-     * Apply a function to many values.
-     * @param f Function to apply.
-     * @param xValues Input values.
-     * @return Output values.
-     */
-    static double[] applyFunction(Function<Double, Double> f, double[] xValues) {
-        double[] output = new double[xValues.length];
-        for (int i=0; i < xValues.length; i++) {
-            output[i] = f.apply(xValues[i]);
-        }
-
-        return output;
-    }
-
     static void runExperiment(double[] observationPoints, Function<Double, Double> underlyingFunction,
                               BiFunction<Double, Double, Double> kernel, double[] testPoints) throws IOException {
 
-        double[] observationY = applyFunction(underlyingFunction, observationPoints);
+        double[] observationY = VectorUtils.applyFunction(underlyingFunction, observationPoints);
 
-        double[] trueValuesAtTestPoints = applyFunction(underlyingFunction, testPoints);
+        double[] trueValuesAtTestPoints = VectorUtils.applyFunction(underlyingFunction, testPoints);
 
         // Model as a Gaussian process to get posterior for the mean and variance at the test points.
         GPUtils.PosteriorResults results = GPUtils.getPredictionsAndStddevs(observationPoints, observationY,
@@ -115,11 +67,11 @@ public class ZeroNoiseExample {
         double x_max = 3.0;
 
         int N_observed = 10;
-        double[] samplePoints = generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
+        double[] samplePoints = VectorUtils.generateRandomlySampledPoints(x_min, x_max, N_observed, rng);
 
         // Generate an even grid of many points that we'll use to plot the function.
         int N_star = 100;
-        double[] evenlySpacedPoints = generateEvenlySpacedPoints(x_min, x_max, N_star);
+        double[] evenlySpacedPoints = VectorUtils.generateEvenlySpacedPoints(x_min, x_max, N_star);
 
         runExperiment(samplePoints, ZeroNoiseExample::y, ZeroNoiseExample::kernelFunction, evenlySpacedPoints);
 
